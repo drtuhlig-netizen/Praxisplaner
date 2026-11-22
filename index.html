@@ -33,6 +33,17 @@ nav button.on{background:var(--ac);color:var(--on)}
 .btns{display:flex;gap:6px}
 .bar{display:flex;justify-content:space-between;align-items:center;font-size:.85rem;color:var(--mu);margin:2px 0 6px}
 .bar button{padding:4px 10px;font-size:.85rem}
+.lanes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(120px,1fr);gap:8px;overflow-x:auto;margin:10px 0}
+.lane h3{margin:0 0 6px;font-size:.95rem;padding-bottom:4px;border-bottom:3px solid}
+.ab{color:#fff;border-radius:8px;padding:8px;margin:0 0 6px;font-size:.9rem;cursor:pointer;word-break:break-word}
+.ab small{opacity:.92}
+.cal{display:flex;overflow-x:auto;margin:10px 0}
+.cal .lanes{overflow:visible;margin:0;flex:1}
+.ax{position:sticky;left:0;z-index:2;background:var(--bg);flex:0 0 44px;font-size:.75rem;color:var(--mu)}
+.ax .sp{height:28px}.lane h3{height:28px;box-sizing:border-box;overflow:hidden;white-space:nowrap}
+.lb{position:relative}.hl{position:absolute;right:4px}
+.ev{position:absolute;color:#fff;border-radius:6px;padding:2px 5px;font-size:.78rem;line-height:1.25;overflow:hidden;cursor:pointer;box-sizing:border-box;border:1px solid var(--bg);word-break:break-word}
+.leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;margin:4px 0}.leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 #ts{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:99px;opacity:0;transition:.2s;pointer-events:none}
 #ts.show{opacity:1}
 </style></head><body>
@@ -42,7 +53,7 @@ window.onerror=function(m,s,l){document.getElementById("app").innerHTML='<p styl
 const SB="https://fauckovuribrghtnzoek.supabase.co",KEY="sb_publishable_NDlwb7HPyjV9wC5WzvOs7A_5nUD8DTA";
 const TB={a:"appointments",t:"time_entries",v:"vacations"};
 const EMPTY=()=>({sess:null,owner:null,prof:[],a:[],t:[],v:[],last:{a:"",t:"",v:""}});
-let S=EMPTY(),tab="a",msg="",st="",busy=0;
+let S=EMPTY(),tab="a",msg="",st="",busy=0,day="",ed=null;
 try{S=Object.assign(S,JSON.parse(localStorage.getItem("pp2")||"{}"))}catch(x){}
 const $=i=>document.getElementById(i);
 const save=()=>{try{localStorage.setItem("pp2",JSON.stringify(S))}catch(x){toast("Speichern nicht möglich")}};
@@ -89,6 +100,7 @@ async function sync(){
    const q=S.last[k]?"&updated_at=gt."+encodeURIComponent(S.last[k]):"";
    const g=await rq("/rest/v1/"+tb+"?select=*&order=updated_at.asc"+q);if(!g.ok)throw"net";
    for(const r of await g.json()){const i=S[k].findIndex(x=>x.id==r.id);if(i<0)S[k].push(r);else S[k][i]=r;S.last[k]=r.updated_at}}
+  if(me()&&me().role=="staff")S.a=S.a.filter(a=>a._n||a._d||a.assignee==me().name);
   st="ok";save();if(bad)toast(bad+" Änderung(en) nicht erlaubt")
  }catch(x){st=x=="auth"?"auth":"offline"}
  busy=0;render()}
@@ -112,8 +124,14 @@ async function chPw(){const a=$("pw1").value,b=$("pw2").value;
 
 /* ---- Aktionen ---- */
 function addA(){const d=$("ad").value,k=$("ak").value.trim();if(!d||!k)return toast("Datum und Kunde nötig");
- S.a.push({id:uid(),starts_on:d,starts_at:$("ah").value||null,customer:k,place:$("ao").value.trim(),reason:$("at").value.trim(),assignee:$("aw").value||null,deleted:false,_n:1});save();render();sync()}
-function del(k,i){const r=S[k].find(x=>x.id==i);if(r._n)S[k]=S[k].filter(x=>x!==r);else{r.deleted=true;mark(r)}save();render();sync()}
+ const v={starts_on:d,starts_at:$("ah").value||null,customer:k,place:$("ao").value.trim(),reason:$("at").value.trim(),assignee:$("aw").value||null,duration_min:+$("au").value||60};
+ if(ed){const r=S.a.find(x=>x.id==ed);Object.assign(r,v);mark(r);ed=null}else S.a.push(Object.assign({id:uid(),deleted:false,_n:1},v));
+ day=d;save();render();sync()}
+function editA(i){const r=S.a.find(x=>x.id==i);if(!r)return;ed=i;day=r.starts_on;render();window.scrollTo(0,0)}
+function cancelA(){ed=null;render()}
+function setDay(d){day=d||day;render()}
+function shiftDay(n){const x=new Date((day||today())+"T12:00");x.setDate(x.getDate()+n);day=dk(x);render()}
+function del(k,i){const r=S[k].find(x=>x.id==i);if(!r)return;ed=null;if(r._n)S[k]=S[k].filter(x=>x!==r);else{r.deleted=true;mark(r)}save();render();sync()}
 function stamp(){const u=S.sess.user.id,o=S.t.find(x=>x.user_id==u&&!x.ended_at&&!x.deleted),n=new Date().toISOString();
  if(o){o.ended_at=n;mark(o)}else S.t.push({id:uid(),user_id:u,started_at:n,ended_at:null,deleted:false,_n:1});save();render();sync()}
 function addV(){const a=$("va").value,b=$("vb").value;if(!a||!b||b<a)return toast("Zeitraum prüfen");
@@ -121,9 +139,37 @@ function addV(){const a=$("va").value,b=$("vb").value;if(!a||!b||b<a)return toas
 function dec(i,s){const r=S.v.find(x=>x.id==i);r.status=s;mark(r);render();sync()}
 
 /* ---- Ansichten ---- */
-const vA=()=>{const t=today(),L=live("a").sort((x,y)=>(x.starts_on+(x.starts_at||"")).localeCompare(y.starts_on+(y.starts_at||"")));
-return `<div class="card"><h2>Neuer Termin</h2><div class="row"><input id="ad" type="date" value="${t}"><input id="ah" type="time" value="08:00"></div><input id="ak" placeholder="Kunde / Betrieb"><input id="ao" placeholder="Ort"><input id="at" placeholder="Anlass (Tier, Behandlung)"><select id="aw"><option value="">Zuständig: offen</option>${S.prof.filter(p=>p.role!="praxis").map(p=>`<option>${e(p.name)}</option>`).join("")}</select><button onclick="addA()">Termin speichern</button></div>`+
-(L.map(a=>`<div class="card item ${a.starts_on<t?"past":""}"><div><b>${fd(a.starts_on)} ${e((a.starts_at||"").slice(0,5))}</b> · ${e(a.customer)}<br><span class="mu">${e(a.place)} ${e(a.reason)}${a.assignee?" · "+e(a.assignee):""}</span></div><button class="g" onclick="del('a','${a.id}')">✕</button></div>`).join("")||`<p class="mu">Noch keine Termine.</p>`)};
+const VO=["Thomas Uhlig","Christina Hertwig","Rahel Kreißig","Hanna Kunze"],CL=["#2f6b4f","#2b6cb0","#b4531a","#7b4bb0","#a1306b"];
+const vets=()=>{const m=new Map();VO.forEach(n=>m.set(n,{name:n}));S.prof.filter(p=>p.role!="praxis").forEach(p=>m.set(p.name,p));const f=n=>{const i=VO.indexOf(n);return i<0?99:i};return[...m.values()].sort((x,y)=>f(x.name)-f(y.name)||x.name.localeCompare(y.name))};
+const col=n=>{const i=vets().findIndex(p=>p.name==n);return i<0?"#6b7a70":CL[i%CL.length]};
+const can=()=>{const m=me();return !!m&&(m.role=="admin"||m.role=="praxis")};
+const hm=a=>e((a.starts_at||"").slice(0,5));
+const cmp=(x,y)=>(x.starts_on+(x.starts_at||"")).localeCompare(y.starts_on+(y.starts_at||""));
+const DUR=[[15,"15 Min"],[30,"30 Min"],[45,"45 Min"],[60,"1 Std"],[90,"1,5 Std"],[120,"2 Std"],[180,"3 Std"],[240,"4 Std"],[360,"6 Std"],[480,"8 Std"]];
+const dm=a=>a.duration_min||60,tmin=a=>{const q=(a.starts_at||"0:0").split(":");return+q[0]*60+ +q[1]};
+const fm=m=>p2(Math.floor(m/60)%24)+":"+p2(m%60);
+const rng=a=>a.starts_at?fm(tmin(a))+"–"+fm(tmin(a)+dm(a)):"";
+function pack(L){const out=[];let cl=[],end=0;
+ const fin=()=>{const n=Math.max(0,...cl.map(x=>x.c))+1;cl.forEach(x=>x.n=n);out.push(...cl);cl=[];end=0};
+ L.forEach(a=>{const s=tmin(a),f=s+dm(a);if(cl.length&&s>=end)fin();
+  const used=cl.filter(x=>x.f>s).map(x=>x.c);let c=0;while(used.includes(c))c++;
+  cl.push({a,s,f,c});end=Math.max(end,f)});
+ if(cl.length)fin();return out}
+const vA=()=>{const t=today(),dd=day||t,all=live("a");
+ if(!can()){const mn=me().name,L=all.filter(a=>a.assignee==mn&&a.starts_on>=t).sort(cmp);
+  return `<h2>Meine Termine</h2>`+(L.map(a=>`<div class="ab" style="background:${col(a.assignee)}"><b>${fd(a.starts_on)} ${rng(a)}</b> ${e(a.customer)}<br><small>${e(a.place)} ${e(a.reason)}</small></div>`).join("")||`<p class="mu">Keine anstehenden Termine.</p>`)}
+ const r=ed?S.a.find(x=>x.id==ed):null,v=r||{starts_on:dd,starts_at:"08:00",duration_min:60,customer:"",place:"",reason:"",assignee:""};
+ const dayA=all.filter(a=>a.starts_on==dd).sort((x,y)=>(x.starts_at||"").localeCompare(y.starts_at||"")),sch=dayA.filter(a=>a.starts_at),un=dayA.filter(a=>!a.starts_at);
+ let h0=6,h1=20;sch.forEach(a=>{h0=Math.min(h0,Math.floor(tmin(a)/60));h1=Math.max(h1,Math.ceil((tmin(a)+dm(a))/60))});h1=Math.min(h1,24);
+ const PP=1.2,H=(h1-h0)*60*PP;
+ const lanes=vets().map(p=>({n:p.name,c:col(p.name),L:dayA.filter(a=>a.assignee==p.name)})).concat([{n:"Offen",c:"#6b7a70",L:dayA.filter(a=>!vets().some(p=>p.name==a.assignee))}]);
+ const hours=[];for(let h=h0;h<h1;h++)hours.push(h);
+ const body=l=>`<div class="lb" style="height:${H}px;background:repeating-linear-gradient(to bottom,var(--bd) 0 1px,transparent 1px ${60*PP}px)">${pack(l.L.filter(a=>a.starts_at)).map(x=>`<div class="ev" title="${e(x.a.customer)}" style="top:${(x.s-h0*60)*PP}px;height:${Math.max(dm(x.a)*PP,26)}px;left:${x.c*100/x.n}%;width:${100/x.n}%;background:${col(x.a.assignee)}" onclick="editA('${x.a.id}')"><b>${rng(x.a)}</b> ${e(x.a.customer)}<br>${e(x.a.place)} ${e(x.a.reason)}</div>`).join("")}</div>`;
+ return `<div class="card"><h2>${r?"Termin ändern":"Neuer Termin"}</h2><div class="row"><input id="ad" type="date" value="${e(v.starts_on)}"><input id="ah" type="time" value="${e((v.starts_at||"").slice(0,5))}"></div><select id="au">${DUR.map(d=>`<option value="${d[0]}" ${(v.duration_min||60)==d[0]?"selected":""}>Dauer: ${d[1]}</option>`).join("")}</select><input id="ak" placeholder="Kunde / Betrieb" value="${e(v.customer)}"><input id="ao" placeholder="Ort" value="${e(v.place)}"><input id="at" placeholder="Anlass (Tier, Behandlung)" value="${e(v.reason)}"><select id="aw"><option value="">Zuständig: offen</option>${vets().map(p=>`<option ${v.assignee==p.name?"selected":""}>${e(p.name)}</option>`).join("")}</select><button onclick="addA()">${r?"Änderung speichern":"Termin speichern"}</button>${r?`<button class="g" onclick="cancelA()">Abbrechen</button><button class="g" onclick="del('a','${r.id}')">Termin löschen</button>`:""}</div>`+
+ `<div class="card"><div class="row"><button class="g" onclick="shiftDay(-1)">‹</button><input type="date" value="${dd}" onchange="setDay(this.value)"><button class="g" onclick="shiftDay(1)">›</button></div><button class="g" onclick="setDay(today())">Heute</button></div>`+
+ `<h2>${new Date(dd+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"})}</h2>`+
+ (un.length?`<div class="card"><b>Ohne Uhrzeit</b>${un.map(a=>`<div class="ab" style="background:${col(a.assignee)};margin-top:6px" onclick="editA('${a.id}')"><b>${e((a.assignee||"offen").split(" ")[0])}:</b> ${e(a.customer)} <small>${e(a.place)} ${e(a.reason)}</small></div>`).join("")}</div>`:"")+
+ `<div class="leg">${lanes.map(l=>`<span><i style="background:${l.c}"></i>${e(l.n.split(" ")[0])}</span>`).join("")}</div><div class="cal"><div class="ax"><div class="sp"></div><div class="lb" style="height:${H}px">${hours.map(h=>`<div class="hl" style="top:${(h-h0)*60*PP}px">${p2(h)}:00</div>`).join("")}</div></div><div class="lanes">${lanes.map(l=>`<div class="lane"><h3 style="border-color:${l.c}">${e(l.n.split(" ")[0])} <span class="mu">(${l.L.length})</span></h3>${body(l)}</div>`).join("")}</div></div>`};
 
 const vZ=()=>{const u=S.sess.user.id,o=live("t").find(x=>x.user_id==u&&!x.ended_at),L=live("t").filter(x=>x.user_id==u).sort((a,b)=>b.started_at.localeCompare(a.started_at)).slice(0,40);
 return `<div class="card"><h2>Arbeitszeit</h2>${o?`<p>Läuft seit ${tm(o.started_at)} (${fh(Date.now()-new Date(o.started_at))})</p><button onclick="stamp()">Gehen</button>`:`<button onclick="stamp()">Kommen</button>`}<p class="mu">Dieser Monat: ${month(u)}</p></div>`+
@@ -139,12 +185,13 @@ return `<h2>Offene Urlaubsanträge</h2>`+(op.map(x=>`<div class="card item"><div
 
 const vC=()=>`<div class="card"><h2>Passwort ändern</h2><input id="pw1" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 8 Zeichen)"><input id="pw2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen"><button onclick="chPw()">Passwort ändern</button><p class="mu">Angemeldet als ${e(me().name)}. Dafür ist Internet nötig.</p></div>`;
 
-function render(){const A=$("app"),m=me();
+function render(){const A=$("app"),m=me();A.style.maxWidth="";
  if(!m){A.innerHTML=`<div class="card"><h1>Praxisplaner</h1><label>E-Mail<input id="le" type="email" autocomplete="username"></label><label>Passwort<input id="lp" type="password" autocomplete="current-password"></label><button onclick="login()">Anmelden</button><p class="er">${e(msg)}</p>${pend()?`<p class="mu">${pend()} ungesendete Änderung(en) auf diesem Gerät werden nach der Anmeldung abgeglichen.</p>`:""}</div>`;return}
  const r=m.role,tabs=[["a","Termine"]].concat(r=="praxis"?[]:[["z","Zeit"],["v","Urlaub"]]).concat(r=="admin"?[["x","Verwaltung"]]:[]).concat([["c","Konto"]]);
  if(!tabs.some(t=>t[0]==tab))tab="a";
  const s=st=="sync"?"Synchronisiere…":st=="auth"?"Bitte neu anmelden":(!navigator.onLine||st=="offline")?"Offline":"Synchronisiert",n=pend();
- A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header><div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC}[tab])()}
+ A.style.maxWidth=(tab=="a"&&(r=="admin"||r=="praxis"))?"1100px":"";
+ A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header><div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC}[tab])()+`<p class="mu" style="text-align:center;margin:20px 0 6px">App-Version 7</p>`}
 
 render();sync();
 addEventListener("online",sync);addEventListener("offline",()=>{st="offline";render()});
