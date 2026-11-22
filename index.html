@@ -44,6 +44,10 @@ nav button.on{background:var(--ac);color:var(--on)}
 .lb{position:relative}.hl{position:absolute;right:4px}
 .ev{position:absolute;color:#fff;border-radius:6px;padding:2px 5px;font-size:.78rem;line-height:1.25;overflow:hidden;cursor:pointer;box-sizing:border-box;border:1px solid var(--bg);word-break:break-word}
 .leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;margin:4px 0}.leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.ev,.ab{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.lift{z-index:5;opacity:.88;box-shadow:0 6px 16px rgba(0,0,0,.35);transition:none}.ab.lift{position:relative}
+.lane.drop .lb{outline:2px dashed var(--ac);outline-offset:-2px}
+#dl{position:fixed;z-index:9;background:var(--tx);color:var(--bg);padding:4px 10px;border-radius:99px;font-size:.85rem;pointer-events:none;white-space:nowrap}
 #ts{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:99px;opacity:0;transition:.2s;pointer-events:none}
 #ts.show{opacity:1}
 </style></head><body>
@@ -53,7 +57,7 @@ window.onerror=function(m,s,l){document.getElementById("app").innerHTML='<p styl
 const SB="https://fauckovuribrghtnzoek.supabase.co",KEY="sb_publishable_NDlwb7HPyjV9wC5WzvOs7A_5nUD8DTA";
 const TB={a:"appointments",t:"time_entries",v:"vacations"};
 const EMPTY=()=>({sess:null,owner:null,prof:[],a:[],t:[],v:[],last:{a:"",t:"",v:""}});
-let S=EMPTY(),tab="a",msg="",st="",busy=0,day="",ed=null;
+let S=EMPTY(),tab="a",msg="",st="",busy=0,day="",ed=null,drag=null,noClick=0;
 try{S=Object.assign(S,JSON.parse(localStorage.getItem("pp2")||"{}"))}catch(x){}
 const $=i=>document.getElementById(i);
 const save=()=>{try{localStorage.setItem("pp2",JSON.stringify(S))}catch(x){toast("Speichern nicht möglich")}};
@@ -127,7 +131,7 @@ function addA(){const d=$("ad").value,k=$("ak").value.trim();if(!d||!k)return to
  const v={starts_on:d,starts_at:$("ah").value||null,customer:k,place:$("ao").value.trim(),reason:$("at").value.trim(),assignee:$("aw").value||null,duration_min:+$("au").value||60};
  if(ed){const r=S.a.find(x=>x.id==ed);Object.assign(r,v);mark(r);ed=null}else S.a.push(Object.assign({id:uid(),deleted:false,_n:1},v));
  day=d;save();render();sync()}
-function editA(i){const r=S.a.find(x=>x.id==i);if(!r)return;ed=i;day=r.starts_on;render();window.scrollTo(0,0)}
+function editA(i){if(Date.now()<noClick)return;const r=S.a.find(x=>x.id==i);if(!r)return;ed=i;day=r.starts_on;render();window.scrollTo(0,0)}
 function cancelA(){ed=null;render()}
 function setDay(d){day=d||day;render()}
 function shiftDay(n){const x=new Date((day||today())+"T12:00");x.setDate(x.getDate()+n);day=dk(x);render()}
@@ -164,12 +168,12 @@ const vA=()=>{const t=today(),dd=day||t,all=live("a");
  const PP=1.2,H=(h1-h0)*60*PP;
  const lanes=vets().map(p=>({n:p.name,c:col(p.name),L:dayA.filter(a=>a.assignee==p.name)})).concat([{n:"Offen",c:"#6b7a70",L:dayA.filter(a=>!vets().some(p=>p.name==a.assignee))}]);
  const hours=[];for(let h=h0;h<h1;h++)hours.push(h);
- const body=l=>`<div class="lb" style="height:${H}px;background:repeating-linear-gradient(to bottom,var(--bd) 0 1px,transparent 1px ${60*PP}px)">${pack(l.L.filter(a=>a.starts_at)).map(x=>`<div class="ev" title="${e(x.a.customer)}" style="top:${(x.s-h0*60)*PP}px;height:${Math.max(dm(x.a)*PP,26)}px;left:${x.c*100/x.n}%;width:${100/x.n}%;background:${col(x.a.assignee)}" onclick="editA('${x.a.id}')"><b>${rng(x.a)}</b> ${e(x.a.customer)}<br>${e(x.a.place)} ${e(x.a.reason)}</div>`).join("")}</div>`;
+ const body=l=>`<div class="lb" style="height:${H}px;background:repeating-linear-gradient(to bottom,var(--bd) 0 1px,transparent 1px ${60*PP}px)">${pack(l.L.filter(a=>a.starts_at)).map(x=>`<div class="ev" data-id="${x.a.id}" title="${e(x.a.customer)}" style="top:${(x.s-h0*60)*PP}px;height:${Math.max(dm(x.a)*PP,26)}px;left:${x.c*100/x.n}%;width:${100/x.n}%;background:${col(x.a.assignee)}" onclick="editA('${x.a.id}')"><b>${rng(x.a)}</b> ${e(x.a.customer)}<br>${e(x.a.place)} ${e(x.a.reason)}</div>`).join("")}</div>`;
  return `<div class="card"><h2>${r?"Termin ändern":"Neuer Termin"}</h2><div class="row"><input id="ad" type="date" value="${e(v.starts_on)}"><input id="ah" type="time" value="${e((v.starts_at||"").slice(0,5))}"></div><select id="au">${DUR.map(d=>`<option value="${d[0]}" ${(v.duration_min||60)==d[0]?"selected":""}>Dauer: ${d[1]}</option>`).join("")}</select><input id="ak" placeholder="Kunde / Betrieb" value="${e(v.customer)}"><input id="ao" placeholder="Ort" value="${e(v.place)}"><input id="at" placeholder="Anlass (Tier, Behandlung)" value="${e(v.reason)}"><select id="aw"><option value="">Zuständig: offen</option>${vets().map(p=>`<option ${v.assignee==p.name?"selected":""}>${e(p.name)}</option>`).join("")}</select><button onclick="addA()">${r?"Änderung speichern":"Termin speichern"}</button>${r?`<button class="g" onclick="cancelA()">Abbrechen</button><button class="g" onclick="del('a','${r.id}')">Termin löschen</button>`:""}</div>`+
  `<div class="card"><div class="row"><button class="g" onclick="shiftDay(-1)">‹</button><input type="date" value="${dd}" onchange="setDay(this.value)"><button class="g" onclick="shiftDay(1)">›</button></div><button class="g" onclick="setDay(today())">Heute</button></div>`+
  `<h2>${new Date(dd+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"})}</h2>`+
- (un.length?`<div class="card"><b>Ohne Uhrzeit</b>${un.map(a=>`<div class="ab" style="background:${col(a.assignee)};margin-top:6px" onclick="editA('${a.id}')"><b>${e((a.assignee||"offen").split(" ")[0])}:</b> ${e(a.customer)} <small>${e(a.place)} ${e(a.reason)}</small></div>`).join("")}</div>`:"")+
- `<div class="leg">${lanes.map(l=>`<span><i style="background:${l.c}"></i>${e(l.n.split(" ")[0])}</span>`).join("")}</div><div class="cal"><div class="ax"><div class="sp"></div><div class="lb" style="height:${H}px">${hours.map(h=>`<div class="hl" style="top:${(h-h0)*60*PP}px">${p2(h)}:00</div>`).join("")}</div></div><div class="lanes">${lanes.map(l=>`<div class="lane"><h3 style="border-color:${l.c}">${e(l.n.split(" ")[0])} <span class="mu">(${l.L.length})</span></h3>${body(l)}</div>`).join("")}</div></div>`};
+ (un.length?`<div class="card"><b>Ohne Uhrzeit</b>${un.map(a=>`<div class="ab" data-id="${a.id}" style="background:${col(a.assignee)};margin-top:6px" onclick="editA('${a.id}')"><b>${e((a.assignee||"offen").split(" ")[0])}:</b> ${e(a.customer)} <small>${e(a.place)} ${e(a.reason)}</small></div>`).join("")}</div>`:"")+
+ `<div class="leg">${lanes.map(l=>`<span><i style="background:${l.c}"></i>${e(l.n.split(" ")[0])}</span>`).join("")}</div><p class="mu">Verschieben: Termin mit der Maus ziehen, auf dem Handy gedrückt halten und ziehen. Antippen öffnet ihn zum Ändern.</p><div class="cal" data-h0="${h0}" data-pp="${PP}"><div class="ax"><div class="sp"></div><div class="lb" style="height:${H}px">${hours.map(h=>`<div class="hl" style="top:${(h-h0)*60*PP}px">${p2(h)}:00</div>`).join("")}</div></div><div class="lanes">${lanes.map(l=>`<div class="lane" data-n="${l.n=="Offen"?"":e(l.n)}"><h3 style="border-color:${l.c}">${e(l.n.split(" ")[0])} <span class="mu">(${l.L.length})</span></h3>${body(l)}</div>`).join("")}</div></div>`};
 
 const vZ=()=>{const u=S.sess.user.id,o=live("t").find(x=>x.user_id==u&&!x.ended_at),L=live("t").filter(x=>x.user_id==u).sort((a,b)=>b.started_at.localeCompare(a.started_at)).slice(0,40);
 return `<div class="card"><h2>Arbeitszeit</h2>${o?`<p>Läuft seit ${tm(o.started_at)} (${fh(Date.now()-new Date(o.started_at))})</p><button onclick="stamp()">Gehen</button>`:`<button onclick="stamp()">Kommen</button>`}<p class="mu">Dieser Monat: ${month(u)}</p></div>`+
@@ -185,13 +189,50 @@ return `<h2>Offene Urlaubsanträge</h2>`+(op.map(x=>`<div class="card item"><div
 
 const vC=()=>`<div class="card"><h2>Passwort ändern</h2><input id="pw1" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 8 Zeichen)"><input id="pw2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen"><button onclick="chPw()">Passwort ändern</button><p class="mu">Angemeldet als ${e(me().name)}. Dafür ist Internet nötig.</p></div>`;
 
-function render(){const A=$("app"),m=me();A.style.maxWidth="";
+function render(){if(drag&&drag.on)return;const A=$("app"),m=me();A.style.maxWidth="";
  if(!m){A.innerHTML=`<div class="card"><h1>Praxisplaner</h1><label>E-Mail<input id="le" type="email" autocomplete="username"></label><label>Passwort<input id="lp" type="password" autocomplete="current-password"></label><button onclick="login()">Anmelden</button><p class="er">${e(msg)}</p>${pend()?`<p class="mu">${pend()} ungesendete Änderung(en) auf diesem Gerät werden nach der Anmeldung abgeglichen.</p>`:""}</div>`;return}
  const r=m.role,tabs=[["a","Termine"]].concat(r=="praxis"?[]:[["z","Zeit"],["v","Urlaub"]]).concat(r=="admin"?[["x","Verwaltung"]]:[]).concat([["c","Konto"]]);
  if(!tabs.some(t=>t[0]==tab))tab="a";
  const s=st=="sync"?"Synchronisiere…":st=="auth"?"Bitte neu anmelden":(!navigator.onLine||st=="offline")?"Offline":"Synchronisiert",n=pend();
  A.style.maxWidth=(tab=="a"&&(r=="admin"||r=="praxis"))?"1100px":"";
- A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header><div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC}[tab])()+`<p class="mu" style="text-align:center;margin:20px 0 6px">App-Version 7</p>`}
+ A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header><div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC}[tab])()+`<p class="mu" style="text-align:center;margin:20px 0 6px">App-Version 8</p>`}
+
+
+/* ---- Termine verschieben (Maus und Finger) ---- */
+const fname=n=>n?n.split(" ")[0]:"Offen";
+function dropInfo(d){const L=[...document.querySelectorAll(".lane")];if(!L.length)return null;
+ let lane=L[0],bd=1e9;for(const l of L){const r=l.getBoundingClientRect(),dx=d.x<r.left?r.left-d.x:d.x>r.right?d.x-r.right:0;if(dx<bd){bd=dx;lane=l}}
+ const cal=document.querySelector(".cal"),h0=+cal.dataset.h0,pp=+cal.dataset.pp,top=lane.querySelector(".lb").getBoundingClientRect().top;
+ let m=Math.round((h0*60+(d.y-d.grab-top)/pp)/15)*15;m=Math.max(0,Math.min(24*60-d.dur,m));
+ return{lane,m,name:lane.dataset.n||""}}
+function dstart(){drag.on=true;drag.el.classList.add("lift");try{drag.el.setPointerCapture(drag.pid)}catch(x){}drag.iv=setInterval(dauto,30);dmove()}
+function dmove(){const cal=document.querySelector(".cal");
+ drag.el.style.transform=`translate(${drag.x-drag.sx+(cal?cal.scrollLeft-drag.sl:0)}px,${drag.y-drag.sy+(scrollY-drag.sY)}px)`;
+ document.querySelectorAll(".lane.drop").forEach(l=>l.classList.remove("drop"));
+ const i=dropInfo(drag);if(!i)return;i.lane.classList.add("drop");
+ let dl=$("dl");if(!dl){dl=document.createElement("div");dl.id="dl";document.body.appendChild(dl)}
+ dl.textContent=fm(i.m)+"–"+fm(i.m+drag.dur)+" · "+fname(i.name);dl.style.left=(drag.x+14)+"px";dl.style.top=(drag.y-34)+"px"}
+function dauto(){if(!drag||!drag.on)return;const cal=document.querySelector(".cal");
+ if(cal){const r=cal.getBoundingClientRect();if(drag.x>r.right-50)cal.scrollLeft+=14;else if(drag.x<r.left+50)cal.scrollLeft-=14}
+ if(drag.y<70)scrollBy(0,-12);else if(drag.y>innerHeight-70)scrollBy(0,12);dmove()}
+function dend(ok){if(!drag)return;const d=drag;clearTimeout(d.t);clearInterval(d.iv);drag=null;const dl=$("dl");if(dl)dl.remove();
+ if(!d.on)return;noClick=Date.now()+500;d.el.classList.remove("lift");d.el.style.transform="";
+ document.querySelectorAll(".lane.drop").forEach(l=>l.classList.remove("drop"));
+ if(!ok)return;const i=dropInfo(d);if(!i)return;const a=d.a;
+ if(a.starts_at&&a.starts_at.slice(0,5)==fm(i.m)&&(a.assignee||"")==i.name)return;
+ a.starts_at=fm(i.m)+":00";a.assignee=i.name||null;mark(a);render();sync()}
+document.addEventListener("pointerdown",ev=>{if(!can()||drag||ev.button>0)return;
+ const el=ev.target.closest&&ev.target.closest("[data-id]");if(!el||!el.closest("#app"))return;
+ const a=S.a.find(x=>x.id==el.dataset.id);if(!a)return;const cal=document.querySelector(".cal");
+ drag={el,a,sx:ev.clientX,sy:ev.clientY,x:ev.clientX,y:ev.clientY,grab:ev.clientY-el.getBoundingClientRect().top,dur:dm(a),on:false,pt:ev.pointerType,sl:cal?cal.scrollLeft:0,sY:scrollY,pid:ev.pointerId};
+ if(ev.pointerType!="mouse")drag.t=setTimeout(()=>{if(drag&&!drag.on)dstart()},350)});
+document.addEventListener("pointermove",ev=>{if(!drag||ev.pointerId!=drag.pid)return;drag.x=ev.clientX;drag.y=ev.clientY;
+ if(!drag.on){const d=Math.hypot(drag.x-drag.sx,drag.y-drag.sy);if(drag.pt=="mouse"){if(d>6)dstart()}else if(d>10){clearTimeout(drag.t);drag=null}return}
+ dmove()});
+document.addEventListener("pointerup",ev=>{if(drag&&ev.pointerId==drag.pid)dend(true)});
+document.addEventListener("pointercancel",ev=>{if(drag&&ev.pointerId==drag.pid)dend(false)});
+document.addEventListener("touchmove",ev=>{if(drag&&drag.on)ev.preventDefault()},{passive:false});
+document.addEventListener("contextmenu",ev=>{if(drag)ev.preventDefault()});
 
 render();sync();
 addEventListener("online",sync);addEventListener("offline",()=>{st="offline";render()});
