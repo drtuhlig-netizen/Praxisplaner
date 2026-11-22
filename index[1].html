@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Praxisplaner</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f6b4f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Praxisplaner">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{--bg:#f4f6f2;--card:#fff;--tx:#1b2820;--mu:#65746a;--ac:#2f6b4f;--on:#fff;--bd:#dce3dc;--er:#b3382c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#131915;--card:#1c251f;--tx:#e8eee9;--mu:#9aa89f;--ac:#6fbf94;--on:#10201a;--bd:#2e3c33;--er:#e5776b;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#131915;--card:#1c251f;--tx:#e8eee9;--mu:#9aa89f;--ac:#6fbf94;--on:#10201a;--bd:#2e3c33;--er:#e5776b;color-scheme:dark}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{max-width:640px;margin:0 auto;padding:12px}
+h1,h2{margin:.4em 0;font-size:1.15rem}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+input,select,button{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:9px;margin:4px 0;width:100%;box-sizing:border-box}
+button{background:var(--ac);color:var(--on);border:0;font-weight:600;cursor:pointer;width:auto;padding:9px 14px}
+button.g{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+.card>button{width:100%}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+nav{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
+nav button{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+nav button.on{background:var(--ac);color:var(--on)}
+.mu{color:var(--mu);font-size:.9rem}.er{color:var(--er)}.past{opacity:.5}
+.tag{font-size:.8rem;padding:2px 8px;border-radius:99px;border:1px solid var(--bd)}
+.tag.g{color:var(--ac)}.tag.n{color:var(--er)}
+.btns{display:flex;gap:6px}
+.bar{display:flex;justify-content:space-between;align-items:center;font-size:.85rem;color:var(--mu);margin:2px 0 6px}
+.bar button{padding:4px 10px;font-size:.85rem}
+#ts{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:99px;opacity:0;transition:.2s;pointer-events:none}
+#ts.show{opacity:1}
+</style></head><body>
+<div id="app"><p style="padding:16px">Praxisplaner wird geladen …<br>Bleibt diese Meldung stehen, läuft die Seite nicht richtig (Adresse prüfen).</p></div><div id="ts"></div>
+<script>
+window.onerror=function(m,s,l){document.getElementById("app").innerHTML='<p style="padding:16px">Fehler in der App: '+String(m).replace(/</g,"&lt;")+' (Zeile '+l+')</p>'};
+const SB="https://fauckovuribrghtnzoek.supabase.co",KEY="sb_publishable_NDlwb7HPyjV9wC5WzvOs7A_5nUD8DTA";
+const TB={a:"appointments",t:"time_entries",v:"vacations"};
+const EMPTY=()=>({sess:null,owner:null,prof:[],a:[],t:[],v:[],last:{a:"",t:"",v:""}});
+let S=EMPTY(),tab="a",msg="",st="",busy=0;
+try{S=Object.assign(S,JSON.parse(localStorage.getItem("pp2")||"{}"))}catch(x){}
+const $=i=>document.getElementById(i);
+const save=()=>{try{localStorage.setItem("pp2",JSON.stringify(S))}catch(x){toast("Speichern nicht möglich")}};
+const e=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const uid=()=>crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c=="x"?r:r&3|8).toString(16)});
+const p2=n=>String(n).padStart(2,"0");
+const dk=ms=>{const d=new Date(ms);return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())};
+const today=()=>dk(Date.now());
+const fd=d=>d?d.split("-").reverse().join("."):"";
+const tm=x=>new Date(x).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+const fh=ms=>{const m=Math.round(ms/6e4);return Math.floor(m/60)+":"+p2(m%60)+" h"};
+const me=()=>S.sess&&S.prof.find(p=>p.id==S.sess.user.id);
+const nm=i=>(S.prof.find(p=>p.id==i)||{}).name||"?";
+const live=k=>S[k].filter(x=>!x.deleted);
+const mark=r=>{if(!r._n)r._d=1;save()};
+const pend=()=>["a","t","v"].reduce((n,k)=>n+S[k].filter(x=>x._n||x._d).length,0);
+const days=v=>Math.round((new Date(v.to_date)-new Date(v.from_date))/864e5)+1;
+const stat={open:"offen",approved:"genehmigt",rejected:"abgelehnt"},tagc={approved:"g",rejected:"n",open:""};
+function toast(s){const t=$("ts");t.textContent=s;t.className="show";setTimeout(()=>t.className="",2400)}
+const month=u=>{const n=new Date();let t=0;live("t").forEach(x=>{const s=new Date(x.started_at);if(x.user_id==u&&s.getMonth()==n.getMonth()&&s.getFullYear()==n.getFullYear())t+=(x.ended_at?new Date(x.ended_at):Date.now())-s});return fh(t)};
+
+/* ---- Server ---- */
+const rq=(path,o={})=>{const h={apikey:KEY,"Content-Type":"application/json"};if(S.sess)h.Authorization="Bearer "+S.sess.access_token;
+ return fetch(SB+path,{method:o.m||"GET",headers:Object.assign(h,o.h||{}),body:o.b?JSON.stringify(o.b):undefined})};
+const setS=j=>{S.sess={access_token:j.access_token,refresh:j.refresh_token,exp:Date.now()+j.expires_in*1e3,user:{id:j.user.id}};save()};
+const auth=(q,b)=>fetch(SB+"/auth/v1/token?grant_type="+q,{method:"POST",headers:{apikey:KEY,"Content-Type":"application/json"},body:JSON.stringify(b)});
+async function fresh(){if(S.sess.exp-6e4>Date.now())return;
+ const r=await auth("refresh_token",{refresh_token:S.sess.refresh});
+ if(r.status>=400&&r.status<500)throw"auth";if(!r.ok)throw"net";setS(await r.json())}
+
+async function sync(){
+ if(busy||!S.sess)return;if(!navigator.onLine){st="offline";return render()}
+ busy=1;st="sync";render();let bad=0;
+ try{await fresh();
+  const pr=await rq("/rest/v1/profiles?select=*");if(!pr.ok)throw"net";S.prof=await pr.json();
+  for(const k in TB){const tb=TB[k];
+   for(const r of S[k].filter(x=>x._n||x._d)){const b={};for(const f in r)if(f[0]!="_")b[f]=r[f];
+    const pa=()=>rq("/rest/v1/"+tb+"?id=eq."+r.id,{m:"PATCH",b});
+    let res=r._n?await rq("/rest/v1/"+tb,{m:"POST",b,h:{Prefer:"return=minimal"}}):await pa();
+    if(r._n&&res.status==409)res=await pa();
+    if(res.ok){delete r._n;delete r._d}
+    else if(res.status>=400&&res.status<500){bad++;if(r._n)S[k]=S[k].filter(x=>x!==r);else{delete r._d;S.last[k]=""}}
+    else throw"net"}
+   const q=S.last[k]?"&updated_at=gt."+encodeURIComponent(S.last[k]):"";
+   const g=await rq("/rest/v1/"+tb+"?select=*&order=updated_at.asc"+q);if(!g.ok)throw"net";
+   for(const r of await g.json()){const i=S[k].findIndex(x=>x.id==r.id);if(i<0)S[k].push(r);else S[k][i]=r;S.last[k]=r.updated_at}}
+  st="ok";save();if(bad)toast(bad+" Änderung(en) nicht erlaubt")
+ }catch(x){st=x=="auth"?"auth":"offline"}
+ busy=0;render()}
+
+async function login(){const em=$("le").value.trim(),pw=$("lp").value;msg="";
+ try{const r=await auth("password",{email:em,password:pw});
+  if(!r.ok){msg=r.status<500?"E-Mail oder Passwort falsch":"Serverfehler";return render()}
+  const j=await r.json();if(S.owner&&S.owner!=j.user.id)S=EMPTY();
+  S.owner=j.user.id;setS(j);tab="a";await sync();
+  if(!me()){msg="Kein Profil gefunden (SQL-Skript prüfen)";S.sess=null;save()}}
+ catch(x){msg="Keine Verbindung: Die erste Anmeldung braucht Internet"}render()}
+function logout(){if(pend()&&!confirm("Es gibt noch nicht synchronisierte Änderungen. Trotzdem abmelden? Diese gehen verloren."))return;S=EMPTY();save();render()}
+function relogin(){S.sess=null;save();render()}
+async function chPw(){const a=$("pw1").value,b=$("pw2").value;
+ if(a.length<8)return toast("Mindestens 8 Zeichen");if(a!=b)return toast("Passwörter stimmen nicht überein");
+ if(!navigator.onLine)return toast("Dafür ist Internet nötig");
+ try{await fresh();const r=await rq("/auth/v1/user",{m:"PUT",b:{password:a}});
+  if(r.ok){toast("Passwort geändert");$("pw1").value=$("pw2").value=""}
+  else toast("Abgelehnt: zu schwach oder identisch mit dem alten Passwort")}
+ catch(x){toast(x=="auth"?"Bitte neu anmelden":"Keine Verbindung")}}
+
+/* ---- Aktionen ---- */
+function addA(){const d=$("ad").value,k=$("ak").value.trim();if(!d||!k)return toast("Datum und Kunde nötig");
+ S.a.push({id:uid(),starts_on:d,starts_at:$("ah").value||null,customer:k,place:$("ao").value.trim(),reason:$("at").value.trim(),assignee:$("aw").value||null,deleted:false,_n:1});save();render();sync()}
+function del(k,i){const r=S[k].find(x=>x.id==i);if(r._n)S[k]=S[k].filter(x=>x!==r);else{r.deleted=true;mark(r)}save();render();sync()}
+function stamp(){const u=S.sess.user.id,o=S.t.find(x=>x.user_id==u&&!x.ended_at&&!x.deleted),n=new Date().toISOString();
+ if(o){o.ended_at=n;mark(o)}else S.t.push({id:uid(),user_id:u,started_at:n,ended_at:null,deleted:false,_n:1});save();render();sync()}
+function addV(){const a=$("va").value,b=$("vb").value;if(!a||!b||b<a)return toast("Zeitraum prüfen");
+ S.v.push({id:uid(),user_id:S.sess.user.id,from_date:a,to_date:b,note:$("vn").value.trim(),status:"open",deleted:false,_n:1});save();render();sync()}
+function dec(i,s){const r=S.v.find(x=>x.id==i);r.status=s;mark(r);render();sync()}
+
+/* ---- Ansichten ---- */
+const vA=()=>{const t=today(),L=live("a").sort((x,y)=>(x.starts_on+(x.starts_at||"")).localeCompare(y.starts_on+(y.starts_at||"")));
+return `<div class="card"><h2>Neuer Termin</h2><div class="row"><input id="ad" type="date" value="${t}"><input id="ah" type="time" value="08:00"></div><input id="ak" placeholder="Kunde / Betrieb"><input id="ao" placeholder="Ort"><input id="at" placeholder="Anlass (Tier, Behandlung)"><select id="aw"><option value="">Zuständig: offen</option>${S.prof.filter(p=>p.role!="praxis").map(p=>`<option>${e(p.name)}</option>`).join("")}</select><button onclick="addA()">Termin speichern</button></div>`+
+(L.map(a=>`<div class="card item ${a.starts_on<t?"past":""}"><div><b>${fd(a.starts_on)} ${e((a.starts_at||"").slice(0,5))}</b> · ${e(a.customer)}<br><span class="mu">${e(a.place)} ${e(a.reason)}${a.assignee?" · "+e(a.assignee):""}</span></div><button class="g" onclick="del('a','${a.id}')">✕</button></div>`).join("")||`<p class="mu">Noch keine Termine.</p>`)};
+
+const vZ=()=>{const u=S.sess.user.id,o=live("t").find(x=>x.user_id==u&&!x.ended_at),L=live("t").filter(x=>x.user_id==u).sort((a,b)=>b.started_at.localeCompare(a.started_at)).slice(0,40);
+return `<div class="card"><h2>Arbeitszeit</h2>${o?`<p>Läuft seit ${tm(o.started_at)} (${fh(Date.now()-new Date(o.started_at))})</p><button onclick="stamp()">Gehen</button>`:`<button onclick="stamp()">Kommen</button>`}<p class="mu">Dieser Monat: ${month(u)}</p></div>`+
+L.map(x=>`<div class="card item"><div><b>${fd(dk(new Date(x.started_at)))}</b> ${tm(x.started_at)}–${x.ended_at?tm(x.ended_at):"…"}</div><span>${fh((x.ended_at?new Date(x.ended_at):Date.now())-new Date(x.started_at))}</span></div>`).join("")};
+
+const vi=x=>`<div class="card item"><div><b>${e(nm(x.user_id))}</b><br>${fd(x.from_date)} – ${fd(x.to_date)} (${days(x)} Tage)<br><span class="mu">${e(x.note)}</span></div><span class="tag ${tagc[x.status]}">${stat[x.status]}</span></div>`;
+const vV=()=>{const u=S.sess.user.id,mine=live("v").filter(x=>x.user_id==u).sort((a,b)=>b.from_date.localeCompare(a.from_date)),team=live("v").filter(x=>x.status=="approved"&&x.to_date>=today()&&x.user_id!=u).sort((a,b)=>a.from_date.localeCompare(b.from_date));
+return `<div class="card"><h2>Urlaub beantragen</h2><div class="row"><input id="va" type="date" value="${today()}"><input id="vb" type="date" value="${today()}"></div><input id="vn" placeholder="Notiz (optional)"><button onclick="addV()">Antrag senden</button></div><h2>Meine Anträge</h2>`+(mine.map(vi).join("")||`<p class="mu">Keine Anträge.</p>`)+`<h2>Team: genehmigter Urlaub</h2>`+(team.map(vi).join("")||`<p class="mu">Nichts geplant.</p>`)};
+
+const vX=()=>{const op=live("v").filter(x=>x.status=="open");
+return `<h2>Offene Urlaubsanträge</h2>`+(op.map(x=>`<div class="card item"><div><b>${e(nm(x.user_id))}</b><br>${fd(x.from_date)} – ${fd(x.to_date)} (${days(x)} Tage)<br><span class="mu">${e(x.note)}</span></div><div class="btns"><button onclick="dec('${x.id}','approved')">OK</button><button class="g" onclick="dec('${x.id}','rejected')">Nein</button></div></div>`).join("")||`<p class="mu">Keine offenen Anträge.</p>`)+
+`<h2>Arbeitszeit diesen Monat</h2><div class="card">${S.prof.filter(p=>p.role!="praxis").map(p=>`<div class="item"><span>${e(p.name)}</span><b>${month(p.id)}</b></div>`).join("")}</div><p class="mu">Passwörter anderer Konten setzt du in Supabase unter Authentication zurück.</p>`};
+
+const vC=()=>`<div class="card"><h2>Passwort ändern</h2><input id="pw1" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 8 Zeichen)"><input id="pw2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen"><button onclick="chPw()">Passwort ändern</button><p class="mu">Angemeldet als ${e(me().name)}. Dafür ist Internet nötig.</p></div>`;
+
+function render(){const A=$("app"),m=me();
+ if(!m){A.innerHTML=`<div class="card"><h1>Praxisplaner</h1><label>E-Mail<input id="le" type="email" autocomplete="username"></label><label>Passwort<input id="lp" type="password" autocomplete="current-password"></label><button onclick="login()">Anmelden</button><p class="er">${e(msg)}</p>${pend()?`<p class="mu">${pend()} ungesendete Änderung(en) auf diesem Gerät werden nach der Anmeldung abgeglichen.</p>`:""}</div>`;return}
+ const r=m.role,tabs=[["a","Termine"]].concat(r=="praxis"?[]:[["z","Zeit"],["v","Urlaub"]]).concat(r=="admin"?[["x","Verwaltung"]]:[]).concat([["c","Konto"]]);
+ if(!tabs.some(t=>t[0]==tab))tab="a";
+ const s=st=="sync"?"Synchronisiere…":st=="auth"?"Bitte neu anmelden":(!navigator.onLine||st=="offline")?"Offline":"Synchronisiert",n=pend();
+ A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header><div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC}[tab])()}
+
+render();sync();
+addEventListener("online",sync);addEventListener("offline",()=>{st="offline";render()});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)sync()});
+setInterval(sync,6e4);
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script></body></html>
