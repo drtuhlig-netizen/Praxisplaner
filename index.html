@@ -51,6 +51,13 @@ nav button.on{background:var(--ac);color:var(--on)}
 .mo{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:calc(12px + env(safe-area-inset-top,0px)) 12px 12px}
 .mc{width:100%;max-width:520px;margin:0}
 .lane h3,.lane .lb{cursor:pointer}
+.evw{position:absolute;left:0;top:0;bottom:0}
+.sw{position:absolute;right:1px;width:6px;border-radius:3px;opacity:.9}
+.sw.run{animation:glow 1.6s ease-in-out infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 var(--sc);opacity:.85}50%{box-shadow:0 0 10px 3px var(--sc);opacity:1}}
+.clk{border-width:2px;border-color:var(--ac)}
+.trow{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0;padding-bottom:8px;border-bottom:1px solid var(--bd)}
+.trow .item{grid-column:1/3}
 #ts{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 14px;border-radius:99px;opacity:0;transition:.2s;pointer-events:none}
 #ts.show{opacity:1}
 </style></head><body>
@@ -60,7 +67,7 @@ window.onerror=function(m,s,l){document.getElementById("app").innerHTML='<p styl
 const SB="https://fauckovuribrghtnzoek.supabase.co",KEY="sb_publishable_NDlwb7HPyjV9wC5WzvOs7A_5nUD8DTA";
 const TB={a:"appointments",t:"time_entries",v:"vacations"};
 const EMPTY=()=>({sess:null,owner:null,prof:[],a:[],t:[],v:[],last:{a:"",t:"",v:""}});
-let S=EMPTY(),tab="a",msg="",st="",busy=0,day="",ed=null,drag=null,noClick=0,nw=null;
+let S=EMPTY(),tab="a",msg="",st="",busy=0,day="",ed=null,drag=null,noClick=0,nw=null,mo="",tp="";
 try{S=Object.assign(S,JSON.parse(localStorage.getItem("pp2")||"{}"))}catch(x){}
 const $=i=>document.getElementById(i);
 const save=()=>{try{localStorage.setItem("pp2",JSON.stringify(S))}catch(x){toast("Speichern nicht möglich")}};
@@ -172,11 +179,15 @@ const vA=()=>{const t=today(),dd=day||t,all=live("a");
   return `<h2>Meine Termine</h2>`+(L.map(a=>`<div class="ab" style="background:${col(a.assignee)}"><b>${fd(a.starts_on)} ${rng(a)}</b> ${e(a.customer)}<br><small>${e(a.place)} ${e(a.reason)}</small></div>`).join("")||`<p class="mu">Keine anstehenden Termine.</p>`)}
  const r=ed?S.a.find(x=>x.id==ed):null,v=r||{starts_on:dd,starts_at:nw?nw.t:"08:00",duration_min:60,customer:"",place:"",reason:"",assignee:nw?nw.w:""};
  const dayA=all.filter(a=>a.starts_on==dd).sort((x,y)=>(x.starts_at||"").localeCompare(y.starts_at||"")),sch=dayA.filter(a=>a.starts_at),un=dayA.filter(a=>!a.starts_at);
- let h0=6,h1=20;sch.forEach(a=>{h0=Math.min(h0,Math.floor(tmin(a)/60));h1=Math.max(h1,Math.ceil((tmin(a)+dm(a))/60))});h1=Math.min(h1,24);
+ const adm=me().role=="admin",dS=new Date(dd+"T00:00:00").getTime(),dE=dS+864e5;
+ const ivs=pid=>live("t").filter(x=>x.user_id==pid).map(x=>{const a0=Date.parse(x.started_at),en=x.ended_at?Date.parse(x.ended_at):Date.now(),a=Math.max(a0,dS),b=Math.min(en,dE);return b>a?{s:(a-dS)/6e4,f:(b-dS)/6e4,run:!x.ended_at&&Date.now()>=dS&&Date.now()<dE}:null}).filter(Boolean);
+ const SW={};vets().forEach(p=>{const pr=adm&&S.prof.find(q=>q.name==p.name&&q.role=="staff");SW[p.name]=pr?ivs(pr.id):null});
+ let h0=6,h1=20;sch.forEach(a=>{h0=Math.min(h0,Math.floor(tmin(a)/60));h1=Math.max(h1,Math.ceil((tmin(a)+dm(a))/60))});
+ Object.values(SW).forEach(a=>(a||[]).forEach(q=>{h0=Math.min(h0,Math.floor(q.s/60));h1=Math.max(h1,Math.ceil(q.f/60))}));h1=Math.min(h1,24);
  const PP=1.2,H=(h1-h0)*60*PP;
- const lanes=vets().map(p=>({n:p.name,c:col(p.name),L:dayA.filter(a=>a.assignee==p.name)})).concat([{n:"Offen",c:"#6b7a70",L:dayA.filter(a=>!vets().some(p=>p.name==a.assignee))}]);
+ const lanes=vets().map(p=>({n:p.name,c:col(p.name),L:dayA.filter(a=>a.assignee==p.name),sw:SW[p.name]})).concat([{n:"Offen",c:"#6b7a70",L:dayA.filter(a=>!vets().some(p=>p.name==a.assignee))}]);
  const hours=[];for(let h=h0;h<h1;h++)hours.push(h);
- const body=l=>`<div class="lb" onclick="laneClick(event,this)" style="height:${H}px;background:repeating-linear-gradient(to bottom,var(--bd) 0 1px,transparent 1px ${60*PP}px)">${pack(l.L.filter(a=>a.starts_at)).map(x=>`<div class="ev" data-id="${x.a.id}" title="${e(x.a.customer)}" style="top:${(x.s-h0*60)*PP}px;height:${Math.max(dm(x.a)*PP,26)}px;left:${x.c*100/x.n}%;width:${100/x.n}%;background:${col(x.a.assignee)}" onclick="editA('${x.a.id}')"><b>${rng(x.a)}</b> ${e(x.a.customer)}<br>${e(x.a.place)} ${e(x.a.reason)}</div>`).join("")}</div>`;
+ const body=l=>`<div class="lb" onclick="laneClick(event,this)" style="height:${H}px;background:repeating-linear-gradient(to bottom,var(--bd) 0 1px,transparent 1px ${60*PP}px)"><div class="evw" style="right:${l.sw?10:0}px">${pack(l.L.filter(a=>a.starts_at)).map(x=>`<div class="ev" data-id="${x.a.id}" title="${e(x.a.customer)}" style="top:${(x.s-h0*60)*PP}px;height:${Math.max(dm(x.a)*PP,26)}px;left:${x.c*100/x.n}%;width:${100/x.n}%;background:${col(x.a.assignee)}" onclick="editA('${x.a.id}')"><b>${rng(x.a)}</b> ${e(x.a.customer)}<br>${e(x.a.place)} ${e(x.a.reason)}</div>`).join("")}</div>${(l.sw||[]).map(q=>`<div class="sw${q.run?" run":""}" title="${e(l.n)}: ${tm(dS+q.s*6e4)}–${q.run?"jetzt":tm(dS+q.f*6e4)}" style="top:${(q.s-h0*60)*PP}px;height:${Math.max((q.f-q.s)*PP,3)}px;background:${l.c};--sc:${l.c}"></div>`).join("")}</div>`;
  return (r||nw?`<div class="mo" onclick="if(event.target==this)cancelA()"><div class="card mc"><h2>${r?"Termin ändern":"Neuer Termin"}</h2><div class="row"><input id="ad" type="date" value="${e(v.starts_on)}"><input id="ah" type="time" value="${e((v.starts_at||"").slice(0,5))}"></div><select id="au">${DUR.map(d=>`<option value="${d[0]}" ${(v.duration_min||60)==d[0]?"selected":""}>Dauer: ${d[1]}</option>`).join("")}</select><input id="ak" placeholder="Kunde / Betrieb" value="${e(v.customer)}"><input id="ao" placeholder="Ort" value="${e(v.place)}"><input id="at" placeholder="Anlass (Tier, Behandlung)" value="${e(v.reason)}"><select id="aw"><option value="">Zuständig: offen</option>${vets().map(p=>`<option ${v.assignee==p.name?"selected":""}>${e(p.name)}</option>`).join("")}</select><button onclick="addA()">${r?"Änderung speichern":"Termin speichern"}</button><button class="g" onclick="cancelA()">Abbrechen</button>${r?`<button class="g" onclick="del('a','${r.id}')">Termin löschen</button>`:""}</div></div>`:"")+
  `<div class="card"><div class="row"><button class="g" onclick="shiftDay(-1)">‹</button><input type="date" value="${dd}" onchange="setDay(this.value)"><button class="g" onclick="shiftDay(1)">›</button></div><button class="g" onclick="setDay(today())">Heute</button></div>`+
  `<h2>${new Date(dd+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"})}</h2>`+
@@ -199,11 +210,91 @@ const vC=()=>`<div class="card"><h2>Passwort ändern</h2><input id="pw1" type="p
 
 function render(){if(drag&&drag.on)return;const fv={};if($("ak"))["ad","ah","au","ak","ao","at","aw"].forEach(i=>{const x=$(i);if(x)fv[i]=x.value});const A=$("app"),m=me();A.style.maxWidth="";
  if(!m){A.innerHTML=`<div class="card"><h1>Praxisplaner</h1><label>E-Mail<input id="le" type="email" autocomplete="username"></label><label>Passwort<input id="lp" type="password" autocomplete="current-password"></label><button onclick="login()">Anmelden</button><p class="er">${e(msg)}</p>${pend()?`<p class="mu">${pend()} ungesendete Änderung(en) auf diesem Gerät werden nach der Anmeldung abgeglichen.</p>`:""}</div>`;return}
- const r=m.role,tabs=[["a","Termine"]].concat(r=="praxis"?[]:[["z","Zeit"],["v","Urlaub"]]).concat(r=="admin"?[["x","Verwaltung"]]:[]).concat([["c","Konto"]]);
+ const r=m.role,tabs=[["a","Termine"]].concat(r=="praxis"?[]:[["z","Zeit"],["v","Urlaub"]]).concat(r=="admin"?[["x","Verwaltung"],["e","Auswertung"]]:[]).concat([["c","Konto"]]);
  if(!tabs.some(t=>t[0]==tab))tab="a";
  const s=st=="sync"?"Synchronisiere…":st=="auth"?"Bitte neu anmelden":(!navigator.onLine||st=="offline")?"Offline":"Synchronisiert",n=pend();
  A.style.maxWidth=(tab=="a"&&(r=="admin"||r=="praxis"))?"1100px":"";
- A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header><div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC}[tab])()+`<p class="mu" style="text-align:center;margin:20px 0 6px">App-Version 9</p>`;for(const i in fv){const x=$(i);if(x)x.value=fv[i]}}
+ A.innerHTML=`<header><b>${e(m.name)}</b><button class="g" onclick="logout()">Abmelden</button></header>${r=="staff"?clk():""}<div class="bar"><span>${s}${n?" · "+n+" offen":""}</span>${st=="auth"?`<button onclick="relogin()">Anmelden</button>`:`<button class="g" onclick="sync()">Abgleichen</button>`}</div><nav>${tabs.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("")}</nav>`+({a:vA,z:vZ,v:vV,x:vX,c:vC,e:vE}[tab])()+`<p class="mu" style="text-align:center;margin:20px 0 6px">App-Version 10</p>`;for(const i in fv){const x=$(i);if(x)x.value=fv[i]}}
+
+
+/* ---- Zeiterfassung: Stempelleiste, Bearbeitung, Monatsabschluss ---- */
+const loc=x=>{const d=new Date(x);return dk(d)+"T"+p2(d.getHours())+":"+p2(d.getMinutes())};
+const hd=ms=>(ms/36e5).toFixed(2).replace(".",",");
+const hh=ms=>fh(ms).replace(" h","");
+const mname=m=>{const q=m.split("-");return new Date(+q[0],+q[1]-1,1).toLocaleDateString("de-DE",{month:"long",year:"numeric"})};
+const clk=()=>{const u=S.sess.user.id,o=live("t").find(x=>x.user_id==u&&!x.ended_at);
+ return `<div class="card item clk"><div><b>${o?"Eingestempelt":"Nicht eingestempelt"}</b><br><span class="mu">${o?"seit "+tm(o.started_at)+" Uhr ("+fh(Date.now()-Date.parse(o.started_at))+")":"Dieser Monat: "+month(u)}</span></div><button class="${o?"g":""}" onclick="stamp()">${o?"Gehen":"Kommen"}</button></div>`};
+function report(m){const out=[];vets().filter(p=>p.id).forEach(p=>{
+ const es=live("t").filter(x=>x.user_id==p.id&&dk(new Date(x.started_at)).slice(0,7)==m).sort((a,b)=>a.started_at.localeCompare(b.started_at));
+ if(p.role=="admin"&&!es.length)return;let tot=0,open=0;const ds=new Set();
+ es.forEach(x=>{ds.add(dk(new Date(x.started_at)));if(x.ended_at)tot+=Date.parse(x.ended_at)-Date.parse(x.started_at);else open++});
+ out.push({p,es,tot,open,days:ds.size})});return out}
+function editT(i,f,v){const x=S.t.find(r=>r.id==i);if(!x)return;
+ if(!v){if(f=="e"){x.ended_at=null;mark(x);render();sync();return}return render()}
+ const iso=new Date(v).toISOString(),s0=f=="s"?iso:x.started_at,e0=f=="e"?iso:x.ended_at;
+ if(e0&&Date.parse(e0)<=Date.parse(s0)){toast("Ende muss nach dem Beginn liegen");return render()}
+ if(f=="s")x.started_at=iso;else x.ended_at=iso;mark(x);render();sync()}
+function delT(i){const x=S.t.find(r=>r.id==i);if(!x||!confirm("Diesen Zeiteintrag löschen?"))return;
+ if(x._n)S.t=S.t.filter(r=>r!==x);else{x.deleted=true;mark(x)}save();render();sync()}
+function addT(){if(!tp)return;const n=new Date(),cur=n.getFullYear()+"-"+p2(n.getMonth()+1),d=mo==cur?today():mo+"-01";
+ S.t.push({id:uid(),user_id:tp,started_at:new Date(d+"T08:00").toISOString(),ended_at:new Date(d+"T16:00").toISOString(),deleted:false,_n:1});save();render();sync()}
+const vE=()=>{const n=new Date(),cur=n.getFullYear()+"-"+p2(n.getMonth()+1);if(!mo)mo=cur;
+ const ppl=vets().filter(p=>p.id);if(!ppl.some(p=>p.id==tp))tp=(ppl.find(p=>p.role=="staff")||ppl[0]||{}).id||"";
+ const E=live("t").filter(x=>x.user_id==tp&&dk(new Date(x.started_at)).slice(0,7)==mo).sort((a,b)=>a.started_at.localeCompare(b.started_at)),R=report(mo);
+ return `<div class="card"><h2>Zeiten bearbeiten</h2><div class="row"><select onchange="tp=this.value;render()">${ppl.map(p=>`<option value="${p.id}" ${p.id==tp?"selected":""}>${e(p.name)}</option>`).join("")}</select><input type="month" value="${mo}" onchange="mo=this.value||mo;render()"></div>`+
+ (E.map(x=>`<div class="trow"><input type="datetime-local" value="${loc(x.started_at)}" onchange="editT('${x.id}','s',this.value)"><input type="datetime-local" value="${x.ended_at?loc(x.ended_at):""}" onchange="editT('${x.id}','e',this.value)"><div class="item"><span class="mu">${x.ended_at?fh(Date.parse(x.ended_at)-Date.parse(x.started_at)):"läuft noch"}</span><button class="g" onclick="delT('${x.id}')">Löschen</button></div></div>`).join("")||`<p class="mu">Keine Einträge in diesem Monat.</p>`)+
+ `<button class="g" onclick="addT()">+ Eintrag hinzufügen</button></div><div class="card"><h2>Monatsabschluss ${e(mname(mo))}</h2>`+
+ (R.map(o=>`<div class="item"><span>${e(o.p.name)}</span><b>${o.days} Tage · ${fh(o.tot)}</b></div>${o.open?`<p class="er">${o.open} Eintrag ohne Ende (bitte oben korrigieren)</p>`:""}`).join("")||`<p class="mu">Keine Daten.</p>`)+
+ `<div class="row" style="margin-top:10px"><button onclick="exportPdf()">Als PDF</button><button onclick="exportXlsx()">Als Excel</button></div><p class="mu">Der Monat wird oben bei „Zeiten bearbeiten“ eingestellt.</p></div>`};
+
+/* PDF (eigener Minimal-Generator, Schrift Helvetica) */
+function pdfBytes(rows){const L1=t=>String(t).replace(/[–—]/g,"-").replace(/…/g,"...").replace(/[^\x00-\xff]/g,"?").replace(/[\\()]/g,m=>"\\"+m);
+ const pages=[[]];let y=800;
+ rows.forEach(r=>{const lh=r.lh||15;if(y-lh<50){pages.push([]);y=800}y-=lh;r.c.forEach((t,i)=>pages[pages.length-1].push(`BT /${r.b?"F2":"F1"} ${r.s||10} Tf 1 0 0 1 ${r.x[i]} ${y} Tm (${L1(t)}) Tj ET`))});
+ const o=[];o[1]="<< /Type /Catalog /Pages 2 0 R >>";
+ o[2]=`<< /Type /Pages /Kids [${pages.map((_,i)=>(5+i*2)+" 0 R").join(" ")}] /Count ${pages.length} >>`;
+ o[3]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+ o[4]="<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+ pages.forEach((pg,i)=>{const c=pg.join("\n");o[5+i*2]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6+i*2} 0 R >>`;o[6+i*2]=`<< /Length ${c.length} >>\nstream\n${c}\nendstream`});
+ let out="%PDF-1.4\n";const off=[];for(let i=1;i<o.length;i++){off[i]=out.length;out+=i+" 0 obj\n"+o[i]+"\nendobj\n"}
+ const xr=out.length;out+=`xref\n0 ${o.length}\n0000000000 65535 f \n`+off.slice(1).map(v=>String(v).padStart(10,"0")+" 00000 n \n").join("")+`trailer\n<< /Size ${o.length} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
+ return Uint8Array.from(out,ch=>ch.charCodeAt(0))}
+function buildPdf(){const R=report(mo),rows=[],C=[50,260,340,440],D=[50,160,250,340];
+ rows.push({x:[50],c:["Arbeitszeiten "+mname(mo)],b:1,s:16,lh:26});
+ rows.push({x:[50],c:["Zusammenfassung"],b:1,s:12,lh:22});
+ rows.push({x:C,c:["Name","Tage","Stunden","Dezimal"],b:1,lh:16});
+ R.forEach(o=>rows.push({x:C,c:[o.p.name,String(o.days),fh(o.tot),hd(o.tot)+(o.open?"  (offen: "+o.open+")":"")]}));
+ R.forEach(o=>{rows.push({x:[50],c:[o.p.name],b:1,s:12,lh:30});rows.push({x:D,c:["Datum","Kommen","Gehen","Dauer"],b:1,lh:15});
+  o.es.forEach(x=>rows.push({x:D,c:[fd(dk(new Date(x.started_at))),tm(x.started_at),x.ended_at?tm(x.ended_at):"offen",x.ended_at?fh(Date.parse(x.ended_at)-Date.parse(x.started_at)):"-"]}));
+  rows.push({x:[50,340],c:["Summe",fh(o.tot)],b:1,lh:20})});
+ rows.push({x:[50],c:["Erstellt am "+new Date().toLocaleDateString("de-DE")],lh:34});
+ return pdfBytes(rows)}
+
+/* Excel (.xlsx, eigener Minimal-Generator) */
+function crc32(u){const T=crc32.t||(crc32.t=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})());let c=~0;for(let i=0;i<u.length;i++)c=T[(c^u[i])&255]^(c>>>8);return(~c)>>>0}
+function zipBytes(files){const te=new TextEncoder(),parts=[],cd=[];let off=0;
+ files.forEach(([n,t])=>{const nb=te.encode(n),d=te.encode(t),crc=crc32(d);
+  const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);h.setUint32(14,crc,true);h.setUint32(18,d.length,true);h.setUint32(22,d.length,true);h.setUint16(26,nb.length,true);
+  parts.push(new Uint8Array(h.buffer),nb,d);
+  const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(14,0x21,true);c.setUint32(16,crc,true);c.setUint32(20,d.length,true);c.setUint32(24,d.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+  cd.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+d.length});
+ const cs=cd.reduce((a,x)=>a+x.length,0),z=new DataView(new ArrayBuffer(22));z.setUint32(0,0x06054b50,true);z.setUint16(8,files.length,true);z.setUint16(10,files.length,true);z.setUint32(12,cs,true);z.setUint32(16,off,true);
+ const all=[...parts,...cd,new Uint8Array(z.buffer)],res=new Uint8Array(all.reduce((a,x)=>a+x.length,0));let q=0;all.forEach(x=>{res.set(x,q);q+=x.length});return res}
+const xe=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sheetXml=rows=>`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${[26,14,16,18,18,16].map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${rows.map((r,i)=>`<row r="${i+1}">${r.map((v,j)=>typeof v=="number"?`<c r="${String.fromCharCode(65+j)}${i+1}"><v>${v}</v></c>`:`<c r="${String.fromCharCode(65+j)}${i+1}" t="inlineStr"><is><t>${xe(v)}</t></is></c>`).join("")}</row>`).join("")}</sheetData></worksheet>`;
+function buildXlsx(){const R=report(mo),dec=ms=>+(ms/36e5).toFixed(2);
+ const s1=[["Arbeitszeiten "+mname(mo)],[],["Name","Tage","Stunden (hh:mm)","Stunden (dezimal)","Einträge ohne Ende"]],s2=[["Name","Datum","Kommen","Gehen","Dauer (hh:mm)","Dauer (dezimal)"]];
+ R.forEach(o=>{s1.push([o.p.name,o.days,hh(o.tot),dec(o.tot),o.open]);
+  o.es.forEach(x=>{const d=x.ended_at?Date.parse(x.ended_at)-Date.parse(x.started_at):0;s2.push([o.p.name,fd(dk(new Date(x.started_at))),tm(x.started_at),x.ended_at?tm(x.ended_at):"offen",x.ended_at?hh(d):"",x.ended_at?dec(d):0])})});
+ const X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',RT="http://schemas.openxmlformats.org/officeDocument/2006/relationships",WS="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+ return zipBytes([["[Content_Types].xml",X+`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="${WS}"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="${WS}"/></Types>`],
+  ["_rels/.rels",X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${RT}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+  ["xl/workbook.xml",X+`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${RT}"><sheets><sheet name="Zusammenfassung" sheetId="1" r:id="rId1"/><sheet name="Details" sheetId="2" r:id="rId2"/></sheets></workbook>`],
+  ["xl/_rels/workbook.xml.rels",X+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${RT}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${RT}/worksheet" Target="worksheets/sheet2.xml"/></Relationships>`],
+  ["xl/worksheets/sheet1.xml",sheetXml(s1)],["xl/worksheets/sheet2.xml",sheetXml(s2)]])}
+function saveFile(bytes,name,type){const u=URL.createObjectURL(new Blob([bytes],{type})),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(u)},4000)}
+function exportPdf(){saveFile(buildPdf(),"Arbeitszeiten_"+mo+".pdf","application/pdf")}
+function exportXlsx(){saveFile(buildXlsx(),"Arbeitszeiten_"+mo+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
 
 
 /* ---- Termine verschieben (Maus und Finger) ---- */
